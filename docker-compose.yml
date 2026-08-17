@@ -29,7 +29,7 @@ services:
     environment:
       RUN_MIGRATIONS: "1"
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
       - media_data:/app/media
