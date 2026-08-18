@@ -74,7 +74,7 @@ export default function App(props: ParentProps) {
             Главная
           </A>
           <A href="/projects">Проекты</A>
-          <A href="/time">Время</A>
+          <A href="/time">Учёт</A>
           <A href="/time/week">Неделя</A>
           <A href="/reports">Отчёты</A>
           <div class="spacer" />

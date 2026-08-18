@@ -2,7 +2,7 @@ import { useSearchParams } from "@solidjs/router";
 import { createMemo, createResource, createSignal, For, onMount, Show } from "solid-js";
 import { request, unwrapList } from "../api/client";
 import type { Project, Task, TimeEntry } from "../api/types";
-import { minutesLabel, todayISO } from "../lib/time";
+import { addDays, minutesLabel, todayISO } from "../lib/time";
 
 export default function TimePage() {
   const [params] = useSearchParams();
@@ -14,7 +14,8 @@ export default function TimePage() {
   const [minutes, setMinutes] = createSignal("0");
   const [comment, setComment] = createSignal("");
   const [error, setError] = createSignal("");
-  const [from, setFrom] = createSignal(todayISO());
+  // По умолчанию показываем записи за последний месяц.
+  const [from, setFrom] = createSignal(addDays(todayISO(), -30));
   const [to, setTo] = createSignal(todayISO());
   const [editing, setEditing] = createSignal<TimeEntry | null>(null);
   const [editHours, setEditHours] = createSignal("0");
@@ -95,6 +96,7 @@ export default function TimePage() {
   }
 
   async function removeEntry(entry: TimeEntry) {
+    if (entry.task_status !== "in_progress") return; // как и для редактирования
     setError("");
     try {
       await request(`/api/time-entries/${entry.id}/`, { method: "DELETE" });
@@ -205,9 +207,26 @@ export default function TimePage() {
                           Редактировать
                         </button>
                       </span>
-                      <button type="button" class="danger" onClick={() => removeEntry(e)}>
-                        Удалить
-                      </button>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          cursor: e.task_status === "in_progress" ? undefined : "not-allowed",
+                        }}
+                        title={
+                          e.task_status === "in_progress"
+                            ? undefined
+                            : "Удалять можно только записи по задачам в статусе «В работе»"
+                        }
+                      >
+                        <button
+                          type="button"
+                          class="danger"
+                          disabled={e.task_status !== "in_progress"}
+                          onClick={() => removeEntry(e)}
+                        >
+                          Удалить
+                        </button>
+                      </span>
                     </div>
                   </td>
                 </tr>

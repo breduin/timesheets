@@ -14,7 +14,6 @@ export default function Week() {
   const [error, setError] = createSignal("");
 
   const days = createMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart(), i)));
-  const rangeKey = createMemo(() => `${weekStart()}|${addDays(weekStart(), 6)}`);
 
   const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/"));
   const [taskMap] = createResource(projects, async (plist) => {
@@ -25,8 +24,8 @@ export default function Week() {
     }
     return all;
   });
-    const [entries, { refetch }] = createResource(rangeKey, (key) => {
-    const [from, to] = key.split("|");
+  const [entries, { refetch }] = createResource(() => weekStart(), (from) => {
+    const to = addDays(from, 6);
     return request<{ results: TimeEntry[] }>(
       `/api/time-entries/?spent_on_after=${from}&spent_on_before=${to}&page_size=500`,
     );
