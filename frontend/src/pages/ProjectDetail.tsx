@@ -195,7 +195,7 @@ export default function ProjectDetail() {
               </form>
             </Show>
             <div class="card">
-              <table>
+              <table class="stack">
                 <thead>
                   <tr>
                     <th>Задача</th>
@@ -207,8 +207,8 @@ export default function ProjectDetail() {
                   <For each={tasks() ?? []}>
                     {(t) => (
                       <tr>
-                        <td>{t.name}</td>
-                        <td>
+                        <td data-label="Задача">{t.name}</td>
+                        <td data-label="Статус">
                           <Show when={canManageTasks()} fallback={t.status}>
                             <select
                               value={t.status}
@@ -220,7 +220,7 @@ export default function ProjectDetail() {
                             </select>
                           </Show>
                         </td>
-                        <td>{minutesLabel(t.total_minutes || 0)}</td>
+                        <td data-label="Часы">{minutesLabel(t.total_minutes || 0)}</td>
                       </tr>
                     )}
                   </For>
@@ -230,7 +230,7 @@ export default function ProjectDetail() {
 
             <h2>Участники</h2>
             <div class="card">
-              <table>
+              <table class="stack">
                 <thead>
                   <tr>
                     <th>Email</th>
@@ -242,8 +242,8 @@ export default function ProjectDetail() {
                   <For each={members() ?? []}>
                     {(m) => (
                       <tr>
-                        <td>{m.user.email}</td>
-                        <td>
+                        <td data-label="Email">{m.user.email}</td>
+                        <td data-label="Роль">
                           <Show when={canManageMembers() && m.role !== "owner"} fallback={m.role}>
                             <select value={m.role} onChange={(e) => changeRole(m.user.id, e.currentTarget.value as Role)}>
                               <For each={INVITE_ROLES}>{(r) => <option value={r}>{r}</option>}</For>

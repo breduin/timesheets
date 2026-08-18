@@ -132,7 +132,7 @@ export default function Reports() {
             <Show when={r().entries}>
               <div class="card" style={{ "margin-top": "12px" }}>
                 <h2>Детализация</h2>
-                <table>
+                <table class="stack">
                   <thead>
                     <tr>
                       <th>Дата</th>
@@ -149,14 +149,14 @@ export default function Reports() {
                     <For each={r().entries}>
                       {(e) => (
                         <tr>
-                          <td>{e.spent_on}</td>
-                          <td>{e.project_name}</td>
-                          <td>{e.task_name}</td>
+                          <td data-label="Дата">{e.spent_on}</td>
+                          <td data-label="Проект">{e.project_name}</td>
+                          <td data-label="Задача">{e.task_name}</td>
                           <Show when={r().by_user}>
-                            <td>{e.user_email}</td>
+                            <td data-label="Кто">{e.user_email}</td>
                           </Show>
-                          <td>{minutesLabel(e.duration_minutes)}</td>
-                          <td>{e.comment}</td>
+                          <td data-label="Время">{minutesLabel(e.duration_minutes)}</td>
+                          <td data-label="Комментарий">{e.comment}</td>
                         </tr>
                       )}
                     </For>

@@ -163,7 +163,7 @@ export default function TimePage() {
         </div>
       </div>
       <div class="card" style={{ "margin-top": "12px" }}>
-        <table>
+        <table class="stack">
           <thead>
             <tr>
               <th>Дата</th>
@@ -178,12 +178,12 @@ export default function TimePage() {
             <For each={unwrapList(entries() ?? { results: [] })}>
               {(e) => (
                 <tr>
-                  <td>{e.spent_on}</td>
-                  <td>{e.project_name}</td>
-                  <td>{e.task_name}</td>
-                  <td>{minutesLabel(e.duration_minutes)}</td>
-                  <td>{e.comment}</td>
-                  <td>
+                  <td data-label="Дата">{e.spent_on}</td>
+                  <td data-label="Проект">{e.project_name}</td>
+                  <td data-label="Задача">{e.task_name}</td>
+                  <td data-label="Время">{minutesLabel(e.duration_minutes)}</td>
+                  <td data-label="Комментарий">{e.comment}</td>
+                  <td data-label="Управление">
                     <div class="row">
                       <span
                         style={{

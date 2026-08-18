@@ -99,7 +99,7 @@ export default function Week() {
   return (
     <div>
       <h1>Неделя</h1>
-      <div class="row">
+      <div class="row toolbar">
         <button class="secondary" type="button" onClick={() => setWeekStart(addDays(weekStart(), -7))}>
           ←
         </button>
@@ -110,7 +110,7 @@ export default function Week() {
           →
         </button>
       </div>
-      <div class="card" style={{ "margin-top": "12px", overflow: "auto" }}>
+      <div class="card table-scroll" style={{ "margin-top": "12px" }}>
         <table class="week">
           <thead>
             <tr>
