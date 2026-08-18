@@ -9,6 +9,10 @@ function canWriteTime(role?: Role | null) {
 
 type CellKey = string;
 
+function cellKey(taskId: unknown, date: unknown): CellKey {
+  return `${Number(taskId)}:${String(date).slice(0, 10)}`;
+}
+
 export default function Week() {
   const [weekStart, setWeekStart] = createSignal(startOfIsoWeek());
   const [modal, setModal] = createSignal<{ task: Task; date: string; entry?: TimeEntry } | null>(null);
@@ -19,7 +23,7 @@ export default function Week() {
 
   const days = createMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart(), i)));
 
-  const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/"));
+  const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/?page_size=200"));
   const [taskMap] = createResource(projects, async (plist) => {
     const all: Task[] = [];
     for (const p of unwrapList(plist)) {
@@ -39,7 +43,7 @@ export default function Week() {
     const map = new Map<CellKey, number>();
     const byCell = new Map<CellKey, TimeEntry[]>();
     for (const e of unwrapList(entries() ?? { results: [] })) {
-      const key = `${e.task}:${e.spent_on}`;
+      const key = cellKey(e.task, e.spent_on);
       map.set(key, (map.get(key) || 0) + e.duration_minutes);
       const list = byCell.get(key) || [];
       list.push(e);
@@ -48,10 +52,14 @@ export default function Week() {
     return { map, byCell };
   });
 
+  function cellMinutes(taskId: number, date: string) {
+    return grouped().map.get(cellKey(taskId, date)) || 0;
+  }
+
   function openCell(task: Task, date: string) {
     const role = unwrapList(projects() ?? { results: [] }).find((p) => p.id === task.project_id)?.role;
     if (!canWriteTime(role) || task.status !== "in_progress") return;
-    const items = grouped().byCell.get(`${task.id}:${date}`) || [];
+    const items = grouped().byCell.get(cellKey(task.id, date)) || [];
     const entry = items.length === 1 ? items[0] : items[0];
     setHours(entry ? String(Math.floor(entry.duration_minutes / 60)) : "1");
     setMinutes(entry ? String(entry.duration_minutes % 60) : "0");
@@ -143,19 +151,24 @@ export default function Week() {
                       <tr>
                         <td>{task.name}</td>
                         <For each={days()}>
-                          {(d) => {
-                            const mins = grouped().map.get(`${task.id}:${d}`) || 0;
-                            const role = unwrapList(projects() ?? { results: [] }).find((p) => p.id === task.project_id)?.role;
-                            const locked = !canWriteTime(role) || task.status !== "in_progress";
-                            return (
-                              <td
-                                class={locked ? "locked" : undefined}
-                                onClick={() => openCell(task, d)}
-                              >
-                                {mins ? minutesLabel(mins) : ""}
-                              </td>
-                            );
-                          }}
+                          {(d) => (
+                            <td
+                              class={
+                                !canWriteTime(
+                                  unwrapList(projects() ?? { results: [] }).find((p) => p.id === task.project_id)
+                                    ?.role,
+                                ) || task.status !== "in_progress"
+                                  ? "locked"
+                                  : undefined
+                              }
+                              onClick={() => openCell(task, d)}
+                            >
+                              {(() => {
+                                const mins = cellMinutes(task.id, d);
+                                return mins ? minutesLabel(mins) : "";
+                              })()}
+                            </td>
+                          )}
                         </For>
                       </tr>
                     )}

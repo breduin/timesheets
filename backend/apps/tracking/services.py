@@ -64,6 +64,12 @@ class ReportService:
             .annotate(minutes=Sum("duration_minutes"))
             .order_by("task__project__name", "task__name")
         )
+        all_time_by_project = {
+            row["task__project_id"]: row["minutes"] or 0
+            for row in TimeEntry.objects.filter(task__project_id__in=self._project_ids())
+            .values("task__project_id")
+            .annotate(minutes=Sum("duration_minutes"))
+        }
         payload = {
             "totals": {"minutes": totals["minutes"] or 0},
             "by_project": [
@@ -71,6 +77,7 @@ class ReportService:
                     "project_id": row["task__project_id"],
                     "project_name": row["task__project__name"],
                     "minutes": row["minutes"],
+                    "total_minutes": all_time_by_project.get(row["task__project_id"], 0),
                 }
                 for row in by_project
             ],

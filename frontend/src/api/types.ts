@@ -59,7 +59,7 @@ export type Invite = {
 
 export type Report = {
   totals: { minutes: number };
-  by_project: { project_id: number; project_name: string; minutes: number }[];
+  by_project: { project_id: number; project_name: string; minutes: number; total_minutes: number }[];
   by_task: {
     task_id: number;
     task_name: string;

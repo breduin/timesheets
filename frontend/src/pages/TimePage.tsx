@@ -11,8 +11,9 @@ function canWriteTime(role?: Role | null) {
 
 export default function TimePage() {
   const [params] = useSearchParams();
-  const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/"));
+  const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/?page_size=200"));
   const [projectId, setProjectId] = createSignal("");
+  const [projectFilter, setProjectFilter] = createSignal<"all" | "owner" | "member">("all");
   const [taskId, setTaskId] = createSignal("");
   const [date, setDate] = createSignal(todayISO());
   const [hours, setHours] = createSignal("1");
@@ -50,6 +51,17 @@ export default function TimePage() {
   const projectList = createMemo(() => unwrapList(projects() ?? { results: [] }));
   const selectedRole = createMemo(() => projectList().find((p) => String(p.id) === projectId())?.role);
   const canAddTime = createMemo(() => canWriteTime(selectedRole()));
+  const visibleEntries = createMemo(() => {
+    const list = unwrapList(entries() ?? { results: [] });
+    const filter = projectFilter();
+    if (filter === "all") return list;
+    const roleByProject = new Map(projectList().map((p) => [p.id, p.role]));
+    return list.filter((e) => {
+      const role = roleByProject.get(e.project_id);
+      if (filter === "owner") return role === "owner";
+      return Boolean(role) && role !== "owner";
+    });
+  });
 
   function canMutate(entry: TimeEntry) {
     const role = projectList().find((p) => p.id === entry.project_id)?.role;
@@ -207,6 +219,14 @@ export default function TimePage() {
           <label>По</label>
           <input type="date" value={to()} onInput={(e) => setTo(e.currentTarget.value)} />
         </div>
+        <div>
+          <label>Проекты</label>
+          <select value={projectFilter()} onChange={(e) => setProjectFilter(e.currentTarget.value as "all" | "owner" | "member")}>
+            <option value="all">Все</option>
+            <option value="owner">Мои проекты</option>
+            <option value="member">Я участник</option>
+          </select>
+        </div>
       </div>
       <div class="card" style={{ "margin-top": "12px" }}>
         <table class="stack">
@@ -222,7 +242,7 @@ export default function TimePage() {
             </tr>
           </thead>
           <tbody>
-            <For each={unwrapList(entries() ?? { results: [] })}>
+            <For each={visibleEntries()}>
               {(e) => (
                 <tr>
                   <td data-label="Дата">{e.spent_on}</td>

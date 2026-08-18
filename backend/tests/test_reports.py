@@ -15,12 +15,22 @@ def test_summary_minutes_match_and_role_keys():
     add_member(project, developer, Membership.Role.DEVELOPER)
     add_member(project, viewer, Membership.Role.VIEWER)
     task = make_task(project)
+    TimeEntry.objects.create(task=task, user=owner, spent_on="2026-07-01", duration_minutes=30)
     TimeEntry.objects.create(task=task, user=owner, spent_on="2026-08-01", duration_minutes=60)
     TimeEntry.objects.create(task=task, user=developer, spent_on="2026-08-01", duration_minutes=30)
 
     owner_report = auth_client(owner).get(f"/api/reports/summary/?project={project.id}")
     assert owner_report.status_code == 200
-    assert owner_report.data["totals"]["minutes"] == 90
+    assert owner_report.data["totals"]["minutes"] == 120
+    assert owner_report.data["by_project"][0]["minutes"] == 120
+    assert owner_report.data["by_project"][0]["total_minutes"] == 120
+    ranged = auth_client(owner).get(
+        f"/api/reports/summary/?project={project.id}&from=2026-08-01&to=2026-08-01"
+    )
+    assert ranged.status_code == 200
+    assert ranged.data["totals"]["minutes"] == 90
+    assert ranged.data["by_project"][0]["minutes"] == 90
+    assert ranged.data["by_project"][0]["total_minutes"] == 120
     assert "by_user" in owner_report.data
     assert "entries" in owner_report.data
     assert {row["id"] for row in owner_report.data["entries"]} == set(
@@ -29,14 +39,14 @@ def test_summary_minutes_match_and_role_keys():
 
     dev_report = auth_client(developer).get(f"/api/reports/summary/?project={project.id}")
     assert dev_report.status_code == 200
-    assert dev_report.data["totals"]["minutes"] == 90
+    assert dev_report.data["totals"]["minutes"] == 120
     assert "by_user" not in dev_report.data
     assert "entries" in dev_report.data
     assert all(row["user_id"] == developer.id for row in dev_report.data["entries"])
 
     view_report = auth_client(viewer).get(f"/api/reports/summary/?project={project.id}")
     assert view_report.status_code == 200
-    assert view_report.data["totals"]["minutes"] == 90
+    assert view_report.data["totals"]["minutes"] == 120
     assert "by_user" not in view_report.data
     assert "entries" in view_report.data
     assert {row["id"] for row in view_report.data["entries"]} == set(

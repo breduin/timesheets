@@ -1,18 +1,17 @@
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { downloadCsv, request, unwrapList } from "../api/client";
 import type { Project, Report, Task } from "../api/types";
-import { addDays, minutesLabel, startOfIsoWeek } from "../lib/time";
+import { addDays, minutesLabel, todayISO } from "../lib/time";
 
 export default function Reports() {
-  const defaultFrom = startOfIsoWeek();
-  const [from, setFrom] = createSignal(defaultFrom);
-  const [to, setTo] = createSignal(addDays(defaultFrom, 6));
+  const [from, setFrom] = createSignal(addDays(todayISO(), -30));
+  const [to, setTo] = createSignal(todayISO());
   const [projectId, setProjectId] = createSignal("");
   const [taskId, setTaskId] = createSignal("");
   const [userId, setUserId] = createSignal("");
   const [error, setError] = createSignal("");
 
-  const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/"));
+  const [projects] = createResource(() => request<{ results: Project[] }>("/api/projects/?page_size=200"));
   const [tasks] = createResource(projectId, async (pid) => {
     if (!pid) return [] as Task[];
     return request<Task[]>(`/api/projects/${pid}/tasks/`);
@@ -101,7 +100,7 @@ export default function Reports() {
                 <For each={r().by_project}>
                   {(row) => (
                     <div>
-                      {row.project_name}: {minutesLabel(row.minutes)}
+                      {row.project_name}: {minutesLabel(row.minutes)} ({minutesLabel(row.total_minutes)})
                     </div>
                   )}
                 </For>

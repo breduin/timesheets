@@ -28,9 +28,11 @@ export default function App(props: ParentProps) {
   });
   onCleanup(() => document.body.classList.remove("menu-open"));
 
-  function logout() {
+  function logout(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
     clearAuth();
-    navigate("/login");
+    window.location.assign("/login");
   }
 
   return (
@@ -79,9 +81,9 @@ export default function App(props: ParentProps) {
           <A href="/reports">Отчёты</A>
           <div class="spacer" />
           <div class="muted nav-user">{currentUser()?.email}</div>
-          <button class="secondary" onClick={logout}>
+          <A class="nav-logout" href="/login" onClick={logout}>
             Выйти
-          </button>
+          </A>
         </nav>
         <main class="main">{props.children}</main>
       </div>
