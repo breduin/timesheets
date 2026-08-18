@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.projects.permissions import get_visible_project, require_role
-from apps.projects.services import OTHERS_ENTRIES_ROLES, get_role
+from apps.projects.services import OTHERS_ENTRIES_ROLES, OWN_ENTRIES_ROLES
 from apps.tracking.models import TimeEntry
 from apps.tracking.serializers import TimeEntrySerializer, visible_entries_q
 from apps.tracking.services import ReportService
@@ -57,11 +57,9 @@ class TimeEntryDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
 
     def _assert_can_mutate(self, instance):
-        role = get_role(self.request.user, instance.task.project)
+        require_role(self.request.user, instance.task.project, OWN_ENTRIES_ROLES)
         if instance.user_id != self.request.user.id:
             require_role(self.request.user, instance.task.project, OTHERS_ENTRIES_ROLES)
-        elif role is None:
-            get_visible_project(self.request.user, instance.task.project_id)
 
 
 class ReportSummaryView(APIView):

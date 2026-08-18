@@ -30,6 +30,26 @@ def _send_mail(subject, body, to_email):
     )
 
 
+def _new_token():
+    return secrets.token_urlsafe(32)
+
+
+def _expires_at():
+    return timezone.now() + timedelta(days=7)
+
+
+def create_share_invite(*, project, role, invited_by, kind):
+    return Invite.objects.create(
+        project=project,
+        email="",
+        kind=kind,
+        role=role,
+        token=_new_token(),
+        invited_by=invited_by,
+        expires_at=_expires_at(),
+    )
+
+
 def create_or_refresh_invite(*, project, email, role, invited_by):
     email = email.lower().strip()
     if Membership.objects.filter(project=project, user__email__iexact=email).exists():
@@ -52,10 +72,10 @@ def create_or_refresh_invite(*, project, email, role, invited_by):
         _send_mail(f"Вас добавили в проект {project.name}", body, existing_user.email)
         return None
 
-    token = secrets.token_urlsafe(32)
-    expires_at = timezone.now() + timedelta(days=7)
+    token = _new_token()
+    expires_at = _expires_at()
     invite = Invite.objects.filter(
-        project=project, email__iexact=email, accepted_at__isnull=True
+        project=project, email__iexact=email, accepted_at__isnull=True, kind=Invite.Kind.EMAIL
     ).first()
     if invite:
         invite.token = token
@@ -67,6 +87,7 @@ def create_or_refresh_invite(*, project, email, role, invited_by):
         invite = Invite.objects.create(
             project=project,
             email=email,
+            kind=Invite.Kind.EMAIL,
             role=role,
             token=token,
             invited_by=invited_by,
@@ -82,8 +103,17 @@ def create_or_refresh_invite(*, project, email, role, invited_by):
     return invite
 
 
+def _bind_membership(*, invite, user):
+    membership = Membership.objects.filter(project=invite.project, user=user).first()
+    if membership is None:
+        membership = Membership.objects.create(project=invite.project, user=user, role=invite.role)
+    invite.accepted_at = timezone.now()
+    invite.save(update_fields=["accepted_at"])
+    return membership
+
+
 @transaction.atomic
-def accept_invite(*, invite, password=None, current_user=None):
+def accept_invite(*, invite, password=None, current_user=None, email=None):
     if invite.accepted_at:
         raise ValidationError("Приглашение уже принято.")
     if invite.expires_at < timezone.now():
@@ -91,28 +121,44 @@ def accept_invite(*, invite, password=None, current_user=None):
     if invite.role == Membership.Role.OWNER:
         raise ValidationError("Нельзя принять роль владельца.")
 
+    authenticated = current_user is not None and current_user.is_authenticated
+
+    if invite.kind == Invite.Kind.TOKEN:
+        if not authenticated:
+            raise ValidationError("Войдите в аккаунт, чтобы использовать токен.")
+        return _bind_membership(invite=invite, user=current_user)
+
+    if invite.kind == Invite.Kind.LINK:
+        if authenticated:
+            return _bind_membership(invite=invite, user=current_user)
+        email = (email or "").lower().strip()
+        if not email:
+            raise ValidationError({"email": "Укажите email."})
+        if User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Войдите в аккаунт, чтобы принять приглашение.")
+        if not password:
+            raise ValidationError({"password": "Задайте пароль для нового аккаунта."})
+        user = User.objects.create_user(email=email, password=password, is_active=True)
+        return _bind_membership(invite=invite, user=user)
+
     if Membership.objects.filter(project=invite.project, user__email__iexact=invite.email).exists():
         invite.accepted_at = timezone.now()
         invite.save(update_fields=["accepted_at"])
         return Membership.objects.get(project=invite.project, user__email__iexact=invite.email)
 
-    if current_user and current_user.is_authenticated:
+    if authenticated:
         if current_user.email.lower() != invite.email.lower():
             raise ValidationError("Это приглашение для другого email.")
-        user = current_user
-    else:
-        existing = User.objects.filter(email__iexact=invite.email).first()
-        if existing:
-            raise ValidationError("Войдите в аккаунт, чтобы принять приглашение.")
-        if not password:
-            raise ValidationError({"password": "Задайте пароль для нового аккаунта."})
-        user = User.objects.create_user(
-            email=invite.email,
-            password=password,
-            is_active=True,
-        )
+        return _bind_membership(invite=invite, user=current_user)
 
-    membership = Membership.objects.create(project=invite.project, user=user, role=invite.role)
-    invite.accepted_at = timezone.now()
-    invite.save(update_fields=["accepted_at"])
-    return membership
+    existing = User.objects.filter(email__iexact=invite.email).first()
+    if existing:
+        raise ValidationError("Войдите в аккаунт, чтобы принять приглашение.")
+    if not password:
+        raise ValidationError({"password": "Задайте пароль для нового аккаунта."})
+    user = User.objects.create_user(
+        email=invite.email,
+        password=password,
+        is_active=True,
+    )
+    return _bind_membership(invite=invite, user=user)

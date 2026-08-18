@@ -38,7 +38,10 @@ def test_summary_minutes_match_and_role_keys():
     assert view_report.status_code == 200
     assert view_report.data["totals"]["minutes"] == 90
     assert "by_user" not in view_report.data
-    assert "entries" not in view_report.data
+    assert "entries" in view_report.data
+    assert {row["id"] for row in view_report.data["entries"]} == set(
+        TimeEntry.objects.values_list("id", flat=True)
+    )
 
     csv_resp = auth_client(viewer).get(f"/api/reports/summary/?project={project.id}&format=csv")
     assert csv_resp.status_code == 200

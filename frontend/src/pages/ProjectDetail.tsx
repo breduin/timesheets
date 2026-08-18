@@ -1,10 +1,20 @@
 import { useParams } from "@solidjs/router";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { request } from "../api/client";
-import type { Invite, Membership, Project, Role, Task } from "../api/types";
+import type { Invite, InviteKind, Membership, Project, Role, Task } from "../api/types";
 import { minutesLabel } from "../lib/time";
 
 const INVITE_ROLES: Role[] = ["manager", "developer", "viewer"];
+const INVITE_KINDS: { id: InviteKind; label: string }[] = [
+  { id: "email", label: "Через почту" },
+  { id: "link", label: "Сгенерировать ссылку" },
+  { id: "token", label: "Сгенерировать токен" },
+];
+const KIND_LABEL: Record<InviteKind, string> = {
+  email: "почта",
+  link: "ссылка",
+  token: "токен",
+};
 const TASK_STATUSES = [
   ["todo", "К работе"],
   ["in_progress", "В работе"],
@@ -19,6 +29,8 @@ export default function ProjectDetail() {
   const [taskName, setTaskName] = createSignal("");
   const [inviteEmail, setInviteEmail] = createSignal("");
   const [inviteRole, setInviteRole] = createSignal<Role>("developer");
+  const [inviteKind, setInviteKind] = createSignal<InviteKind>("email");
+  const [copied, setCopied] = createSignal("");
 
   const [project, { refetch: refetchProject }] = createResource(id, (pid) =>
     request<Project>(`/api/projects/${pid}/`),
@@ -93,9 +105,11 @@ export default function ProjectDetail() {
     e.preventDefault();
     setError("");
     try {
+      const body: Record<string, string> = { role: inviteRole(), kind: inviteKind() };
+      if (inviteKind() === "email") body.email = inviteEmail();
       await request(`/api/projects/${id()}/invites/`, {
         method: "POST",
-        body: JSON.stringify({ email: inviteEmail(), role: inviteRole() }),
+        body: JSON.stringify(body),
       });
       setInviteEmail("");
       refetchInvites();
@@ -103,6 +117,27 @@ export default function ProjectDetail() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
     }
+  }
+
+  function inviteValue(inv: Invite) {
+    if (inv.kind === "link") return `${window.location.origin}/invite/${inv.token}`;
+    if (inv.kind === "token") return inv.token;
+    return inv.email;
+  }
+
+  async function copyInvite(inv: Invite) {
+    const text = inviteValue(inv);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      el.remove();
+    }
+    setCopied(`${inv.id}`);
   }
 
   async function changeRole(userId: number, role: Role) {
@@ -266,23 +301,57 @@ export default function ProjectDetail() {
 
             <Show when={canManageMembers()}>
               <h2>Пригласить</h2>
-              <form class="card row" onSubmit={sendInvite}>
+              <form class="card grid" onSubmit={sendInvite}>
                 <div>
-                  <label>Email</label>
-                  <input type="email" value={inviteEmail()} onInput={(e) => setInviteEmail(e.currentTarget.value)} required />
-                </div>
-                <div>
-                  <label>Роль</label>
-                  <select value={inviteRole()} onChange={(e) => setInviteRole(e.currentTarget.value as Role)}>
-                    <For each={INVITE_ROLES}>{(r) => <option value={r}>{r}</option>}</For>
+                  <label>Способ</label>
+                  <select
+                    value={inviteKind()}
+                    onChange={(e) => setInviteKind(e.currentTarget.value as InviteKind)}
+                  >
+                    <For each={INVITE_KINDS}>{(k) => <option value={k.id}>{k.label}</option>}</For>
                   </select>
                 </div>
-                <button type="submit">Отправить</button>
+                <Show when={inviteKind() === "email"}>
+                  <div>
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={inviteEmail()}
+                      onInput={(e) => setInviteEmail(e.currentTarget.value)}
+                      required
+                    />
+                  </div>
+                </Show>
+                <div class="row">
+                  <div>
+                    <label>Роль</label>
+                    <select value={inviteRole()} onChange={(e) => setInviteRole(e.currentTarget.value as Role)}>
+                      <For each={INVITE_ROLES}>{(r) => <option value={r}>{r}</option>}</For>
+                    </select>
+                  </div>
+                  <button type="submit">
+                    {inviteKind() === "email" ? "Отправить" : "Сгенерировать"}
+                  </button>
+                </div>
               </form>
               <For each={invites() ?? []}>
                 {(inv) => (
-                  <div class="muted">
-                    Ожидает: {inv.email} ({inv.role})
+                  <div class="card" style={{ "margin-top": "8px" }}>
+                    <div class="muted">
+                      Ожидает: {KIND_LABEL[inv.kind]} ({inv.role})
+                      <Show when={inv.kind === "email"}> {inv.email}</Show>
+                    </div>
+                    <Show when={inv.kind !== "email"}>
+                      <code class="mono">{inviteValue(inv)}</code>
+                      <button
+                        class="secondary"
+                        type="button"
+                        style={{ "margin-top": "8px" }}
+                        onClick={() => copyInvite(inv)}
+                      >
+                        {copied() === String(inv.id) ? "Скопировано" : "Копировать"}
+                      </button>
+                    </Show>
                   </div>
                 )}
               </For>

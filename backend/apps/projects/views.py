@@ -7,7 +7,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.projects.invites import accept_invite, create_or_refresh_invite
+from apps.projects.invites import accept_invite, create_or_refresh_invite, create_share_invite
 from apps.projects.models import Invite, Membership, Project, Task
 from apps.projects.permissions import get_visible_project, require_role
 from apps.projects.serializers import (
@@ -112,14 +112,24 @@ class ProjectInviteListCreateView(generics.ListCreateAPIView):
         require_role(request.user, project, MANAGE_MEMBERS_ROLES)
         serializer = InviteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        invite = create_or_refresh_invite(
-            project=project,
-            email=serializer.validated_data["email"],
-            role=serializer.validated_data["role"],
-            invited_by=request.user,
-        )
-        if invite is None:
-            return Response({"detail": "Пользователь добавлен в проект."}, status=status.HTTP_201_CREATED)
+        kind = serializer.validated_data.get("kind", Invite.Kind.EMAIL)
+        role = serializer.validated_data["role"]
+        if kind == Invite.Kind.EMAIL:
+            invite = create_or_refresh_invite(
+                project=project,
+                email=serializer.validated_data["email"],
+                role=role,
+                invited_by=request.user,
+            )
+            if invite is None:
+                return Response({"detail": "Пользователь добавлен в проект."}, status=status.HTTP_201_CREATED)
+        else:
+            invite = create_share_invite(
+                project=project,
+                role=role,
+                invited_by=request.user,
+                kind=kind,
+            )
         return Response(InviteSerializer(invite).data, status=status.HTTP_201_CREATED)
 
 
@@ -156,8 +166,9 @@ class InviteAcceptView(APIView):
             invite=invite,
             password=serializer.validated_data.get("password"),
             current_user=current_user,
+            email=serializer.validated_data.get("email"),
         )
-        return Response({"detail": "Приглашение принято."})
+        return Response({"detail": "Приглашение принято.", "project_id": invite.project_id})
 
 
 class ProjectTaskListCreateView(generics.ListCreateAPIView):

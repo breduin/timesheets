@@ -111,6 +111,20 @@ button {
 button.secondary { background: var(--panel-2); border: 1px solid var(--border); }
 button.danger { background: var(--danger); }
 button:disabled { opacity: 0.55; cursor: not-allowed; pointer-events: none; }
+input:disabled, select:disabled, textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+code.mono {
+  display: block;
+  word-break: break-all;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
 
 .muted { color: var(--muted); }
 .error { color: var(--danger); font-size: 14px; }

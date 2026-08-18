@@ -125,3 +125,40 @@ def test_manager_can_patch_foreign_entry():
     )
     assert patched.status_code == 200
     assert patched.data["duration_minutes"] == 40
+
+
+@pytest.mark.django_db
+def test_viewer_sees_all_time_entries():
+    owner = make_user("owner@example.com")
+    developer = make_user("dev@example.com")
+    viewer = make_user("view@example.com")
+    project = create_project(user=owner, name="A")
+    add_member(project, developer, Membership.Role.DEVELOPER)
+    add_member(project, viewer, Membership.Role.VIEWER)
+    task = make_task(project)
+    owner_client = auth_client(owner)
+    created = owner_client.post(
+        "/api/time-entries/",
+        {"task": task.id, "spent_on": "2026-08-01", "duration_minutes": 60, "comment": "own"},
+    )
+    assert created.status_code == 201
+    listing = auth_client(viewer).get(f"/api/time-entries/?project={project.id}")
+    assert listing.status_code == 200
+    ids = [row["id"] for row in listing.data["results"]]
+    assert created.data["id"] in ids
+    assert len(ids) == 1
+
+
+@pytest.mark.django_db
+def test_viewer_cannot_delete_time_entry():
+    owner = make_user("owner@example.com")
+    viewer = make_user("view@example.com")
+    project = create_project(user=owner, name="A")
+    add_member(project, viewer, Membership.Role.VIEWER)
+    task = make_task(project)
+    created = auth_client(owner).post(
+        "/api/time-entries/",
+        {"task": task.id, "spent_on": "2026-08-01", "duration_minutes": 20},
+    )
+    deleted = auth_client(viewer).delete(f"/api/time-entries/{created.data['id']}/")
+    assert deleted.status_code == 403

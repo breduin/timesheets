@@ -46,10 +46,14 @@ export type TimeEntry = {
   comment: string;
 };
 
+export type InviteKind = "email" | "link" | "token";
+
 export type Invite = {
   id: number;
   email: string;
+  kind: InviteKind;
   role: Role;
+  token: string;
   expires_at: string;
 };
 

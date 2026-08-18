@@ -14,7 +14,12 @@ OWN_ENTRIES_ROLES = {
     Membership.Role.DEVELOPER,
 }
 OTHERS_ENTRIES_ROLES = {Membership.Role.OWNER, Membership.Role.MANAGER}
-SEE_ALL_ENTRIES_ROLES = {Membership.Role.OWNER, Membership.Role.MANAGER}
+SEE_ALL_ENTRIES_ROLES = {
+    Membership.Role.OWNER,
+    Membership.Role.MANAGER,
+    Membership.Role.VIEWER,
+}
+SEE_BY_USER_ROLES = {Membership.Role.OWNER, Membership.Role.MANAGER}
 INVITE_ROLES = {
     Membership.Role.MANAGER,
     Membership.Role.DEVELOPER,

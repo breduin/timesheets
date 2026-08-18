@@ -20,4 +20,4 @@ class TaskAdmin(admin.ModelAdmin):
 
 @admin.register(Invite)
 class InviteAdmin(admin.ModelAdmin):
-    list_display = ("id", "project", "email", "role", "accepted_at")
+    list_display = ("id", "project", "kind", "email", "role", "accepted_at")

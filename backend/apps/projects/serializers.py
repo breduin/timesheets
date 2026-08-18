@@ -124,33 +124,48 @@ class TaskSerializer(serializers.ModelSerializer):
 
 class InviteSerializer(serializers.ModelSerializer):
     invited_by = UserSerializer(read_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    kind = serializers.ChoiceField(choices=Invite.Kind.choices, default=Invite.Kind.EMAIL)
 
     class Meta:
         model = Invite
         fields = (
             "id",
             "email",
+            "kind",
             "role",
+            "token",
             "expires_at",
             "accepted_at",
             "invited_by",
             "created_at",
         )
-        read_only_fields = ("id", "expires_at", "accepted_at", "invited_by", "created_at")
+        read_only_fields = ("id", "token", "expires_at", "accepted_at", "invited_by", "created_at")
 
     def validate_role(self, value):
         if value not in INVITE_ROLES:
             raise serializers.ValidationError("Эту роль нельзя назначить приглашением.")
         return value
 
+    def validate(self, attrs):
+        kind = attrs.get("kind", Invite.Kind.EMAIL)
+        email = (attrs.get("email") or "").strip().lower()
+        if kind == Invite.Kind.EMAIL and not email:
+            raise serializers.ValidationError({"email": "Укажите email."})
+        attrs["email"] = email if kind == Invite.Kind.EMAIL else ""
+        attrs["kind"] = kind
+        return attrs
+
 
 class InvitePreviewSerializer(serializers.ModelSerializer):
+    project_id = serializers.IntegerField(source="project.id", read_only=True)
     project_name = serializers.CharField(source="project.name", read_only=True)
 
     class Meta:
         model = Invite
-        fields = ("email", "role", "project_name", "expires_at")
+        fields = ("email", "kind", "role", "project_id", "project_name", "expires_at")
 
 
 class InviteAcceptSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)

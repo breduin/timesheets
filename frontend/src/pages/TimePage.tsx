@@ -1,8 +1,13 @@
 import { useSearchParams } from "@solidjs/router";
 import { createMemo, createResource, createSignal, For, onMount, Show } from "solid-js";
 import { request, unwrapList } from "../api/client";
-import type { Project, Task, TimeEntry } from "../api/types";
+import type { Project, Role, Task, TimeEntry } from "../api/types";
 import { addDays, minutesLabel, todayISO } from "../lib/time";
+import { currentUser } from "../stores/auth";
+
+function canWriteTime(role?: Role | null) {
+  return role === "owner" || role === "manager" || role === "developer";
+}
 
 export default function TimePage() {
   const [params] = useSearchParams();
@@ -43,9 +48,19 @@ export default function TimePage() {
   });
 
   const projectList = createMemo(() => unwrapList(projects() ?? { results: [] }));
+  const selectedRole = createMemo(() => projectList().find((p) => String(p.id) === projectId())?.role);
+  const canAddTime = createMemo(() => canWriteTime(selectedRole()));
+
+  function canMutate(entry: TimeEntry) {
+    const role = projectList().find((p) => p.id === entry.project_id)?.role;
+    if (!canWriteTime(role)) return false;
+    if (role === "developer" && entry.user_id !== currentUser()?.id) return false;
+    return true;
+  }
 
   async function submit(e: Event) {
     e.preventDefault();
+    if (!canAddTime()) return;
     setError("");
     const duration = Number(hours()) * 60 + Number(minutes());
     try {
@@ -127,30 +142,59 @@ export default function TimePage() {
           </div>
           <div>
             <label>Задача (в работе)</label>
-            <select value={taskId()} onChange={(e) => setTaskId(e.currentTarget.value)} required>
+            <select
+              value={taskId()}
+              onChange={(e) => setTaskId(e.currentTarget.value)}
+              required
+              disabled={!canAddTime()}
+            >
               <option value="">—</option>
               <For each={tasks() ?? []}>{(t) => <option value={t.id}>{t.name}</option>}</For>
             </select>
           </div>
           <div>
             <label>Дата</label>
-            <input type="date" value={date()} onInput={(e) => setDate(e.currentTarget.value)} required />
+            <input
+              type="date"
+              value={date()}
+              onInput={(e) => setDate(e.currentTarget.value)}
+              required
+              disabled={!canAddTime()}
+            />
           </div>
           <div>
             <label>Часы</label>
-            <input type="number" min="0" value={hours()} onInput={(e) => setHours(e.currentTarget.value)} />
+            <input
+              type="number"
+              min="0"
+              value={hours()}
+              onInput={(e) => setHours(e.currentTarget.value)}
+              disabled={!canAddTime()}
+            />
           </div>
           <div>
             <label>Минуты</label>
-            <input type="number" min="0" max="59" value={minutes()} onInput={(e) => setMinutes(e.currentTarget.value)} />
+            <input
+              type="number"
+              min="0"
+              max="59"
+              value={minutes()}
+              onInput={(e) => setMinutes(e.currentTarget.value)}
+              disabled={!canAddTime()}
+            />
           </div>
         </div>
         <div>
           <label>Комментарий</label>
-          <input value={comment()} onInput={(e) => setComment(e.currentTarget.value)} />
+          <input value={comment()} onInput={(e) => setComment(e.currentTarget.value)} disabled={!canAddTime()} />
         </div>
+        <Show when={selectedRole() === "viewer" || (projectList().length > 0 && projectList().every((p) => p.role === "viewer"))}>
+          <div class="muted">Роль viewer не позволяет добавлять записи.</div>
+        </Show>
         {error() && <div class="error">{error()}</div>}
-        <button type="submit">Сохранить</button>
+        <button type="submit" disabled={!canAddTime()}>
+          Сохранить
+        </button>
       </form>
 
       <h2>Записи</h2>
@@ -171,6 +215,7 @@ export default function TimePage() {
               <th>Дата</th>
               <th>Проект</th>
               <th>Задача</th>
+              <th>Кто</th>
               <th>Время</th>
               <th>Комментарий</th>
               <th>Управление</th>
@@ -183,51 +228,54 @@ export default function TimePage() {
                   <td data-label="Дата">{e.spent_on}</td>
                   <td data-label="Проект">{e.project_name}</td>
                   <td data-label="Задача">{e.task_name}</td>
+                  <td data-label="Кто">{e.user_email}</td>
                   <td data-label="Время">{minutesLabel(e.duration_minutes)}</td>
                   <td data-label="Комментарий">{e.comment}</td>
                   <td data-label="Управление">
-                    <div class="row">
-                      <span
-                        style={{
-                          display: "inline-block",
-                          cursor: e.task_status === "in_progress" ? undefined : "not-allowed",
-                        }}
-                        title={
-                          e.task_status === "in_progress"
-                            ? undefined
-                            : "Редактировать можно только записи по задачам в статусе «В работе»"
-                        }
-                      >
-                        <button
-                          type="button"
-                          class="secondary"
-                          disabled={e.task_status !== "in_progress"}
-                          onClick={() => openEdit(e)}
+                    <Show when={canMutate(e)} fallback={<span class="muted">—</span>}>
+                      <div class="row">
+                        <span
+                          style={{
+                            display: "inline-block",
+                            cursor: e.task_status === "in_progress" ? undefined : "not-allowed",
+                          }}
+                          title={
+                            e.task_status === "in_progress"
+                              ? undefined
+                              : "Редактировать можно только записи по задачам в статусе «В работе»"
+                          }
                         >
-                          Редактировать
-                        </button>
-                      </span>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          cursor: e.task_status === "in_progress" ? undefined : "not-allowed",
-                        }}
-                        title={
-                          e.task_status === "in_progress"
-                            ? undefined
-                            : "Удалять можно только записи по задачам в статусе «В работе»"
-                        }
-                      >
-                        <button
-                          type="button"
-                          class="danger"
-                          disabled={e.task_status !== "in_progress"}
-                          onClick={() => removeEntry(e)}
+                          <button
+                            type="button"
+                            class="secondary"
+                            disabled={e.task_status !== "in_progress"}
+                            onClick={() => openEdit(e)}
+                          >
+                            Редактировать
+                          </button>
+                        </span>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            cursor: e.task_status === "in_progress" ? undefined : "not-allowed",
+                          }}
+                          title={
+                            e.task_status === "in_progress"
+                              ? undefined
+                              : "Удалять можно только записи по задачам в статусе «В работе»"
+                          }
                         >
-                          Удалить
-                        </button>
-                      </span>
-                    </div>
+                          <button
+                            type="button"
+                            class="danger"
+                            disabled={e.task_status !== "in_progress"}
+                            onClick={() => removeEntry(e)}
+                          >
+                            Удалить
+                          </button>
+                        </span>
+                      </div>
+                    </Show>
                   </td>
                 </tr>
               )}

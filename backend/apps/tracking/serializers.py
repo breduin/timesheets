@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.projects.models import Membership
-from apps.projects.services import OTHERS_ENTRIES_ROLES, OWN_ENTRIES_ROLES, get_role
+from apps.projects.services import OTHERS_ENTRIES_ROLES, OWN_ENTRIES_ROLES, SEE_ALL_ENTRIES_ROLES, get_role
 from apps.tracking.models import TimeEntry
 
 User = get_user_model()
@@ -92,12 +92,12 @@ class TimeEntrySerializer(serializers.ModelSerializer):
 
 def visible_entries_q(user):
     memberships = Membership.objects.filter(user=user)
-    owner_manager_ids = memberships.filter(role__in=OTHERS_ENTRIES_ROLES).values_list(
+    see_all_ids = memberships.filter(role__in=SEE_ALL_ENTRIES_ROLES).values_list(
         "project_id", flat=True
     )
     developer_ids = memberships.filter(role=Membership.Role.DEVELOPER).values_list(
         "project_id", flat=True
     )
-    return Q(task__project_id__in=owner_manager_ids) | Q(
+    return Q(task__project_id__in=see_all_ids) | Q(
         task__project_id__in=developer_ids, user=user
     )

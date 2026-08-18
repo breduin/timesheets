@@ -90,8 +90,14 @@ class Task(models.Model):
 
 
 class Invite(models.Model):
+    class Kind(models.TextChoices):
+        EMAIL = "email", "Email"
+        LINK = "link", "Ссылка"
+        TOKEN = "token", "Токен"
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="invites")
-    email = models.EmailField()
+    email = models.EmailField(blank=True, default="")
+    kind = models.CharField(max_length=16, choices=Kind.choices, default=Kind.EMAIL)
     role = models.CharField(max_length=16, choices=Membership.Role.choices)
     token = models.CharField(max_length=64, unique=True)
     invited_by = models.ForeignKey(
@@ -107,7 +113,9 @@ class Invite(models.Model):
         indexes = [
             models.Index(fields=["token"]),
             models.Index(fields=["email", "project"]),
+            models.Index(fields=["kind", "project"]),
         ]
 
     def __str__(self):
-        return f"{self.email} -> {self.project_id}"
+        target = self.email or self.kind
+        return f"{target} -> {self.project_id}"

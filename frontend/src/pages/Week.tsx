@@ -1,7 +1,11 @@
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { request, unwrapList } from "../api/client";
-import type { Project, Task, TimeEntry } from "../api/types";
+import type { Project, Role, Task, TimeEntry } from "../api/types";
 import { addDays, minutesLabel, startOfIsoWeek, weekdayNames } from "../lib/time";
+
+function canWriteTime(role?: Role | null) {
+  return role === "owner" || role === "manager" || role === "developer";
+}
 
 type CellKey = string;
 
@@ -45,7 +49,8 @@ export default function Week() {
   });
 
   function openCell(task: Task, date: string) {
-    if (task.status !== "in_progress") return;
+    const role = unwrapList(projects() ?? { results: [] }).find((p) => p.id === task.project_id)?.role;
+    if (!canWriteTime(role) || task.status !== "in_progress") return;
     const items = grouped().byCell.get(`${task.id}:${date}`) || [];
     const entry = items.length === 1 ? items[0] : items[0];
     setHours(entry ? String(Math.floor(entry.duration_minutes / 60)) : "1");
@@ -140,9 +145,11 @@ export default function Week() {
                         <For each={days()}>
                           {(d) => {
                             const mins = grouped().map.get(`${task.id}:${d}`) || 0;
+                            const role = unwrapList(projects() ?? { results: [] }).find((p) => p.id === task.project_id)?.role;
+                            const locked = !canWriteTime(role) || task.status !== "in_progress";
                             return (
                               <td
-                                class={task.status === "in_progress" ? undefined : "locked"}
+                                class={locked ? "locked" : undefined}
                                 onClick={() => openCell(task, d)}
                               >
                                 {mins ? minutesLabel(mins) : ""}

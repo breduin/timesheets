@@ -1,7 +1,7 @@
 from django.db.models import Sum
 
 from apps.projects.models import Membership
-from apps.projects.services import SEE_ALL_ENTRIES_ROLES
+from apps.projects.services import SEE_BY_USER_ROLES
 from apps.tracking.models import TimeEntry
 from apps.tracking.serializers import visible_entries_q
 
@@ -19,10 +19,10 @@ class ReportService:
         return {m.role for m in self.memberships}
 
     def can_see_by_user(self):
-        return bool(self._roles() & SEE_ALL_ENTRIES_ROLES)
+        return bool(self._roles() & SEE_BY_USER_ROLES)
 
     def can_see_entries(self):
-        return any(m.role != Membership.Role.VIEWER for m in self.memberships)
+        return bool(self.memberships)
 
     def _project_ids(self):
         return [m.project_id for m in self.memberships]

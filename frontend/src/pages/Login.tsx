@@ -1,11 +1,17 @@
-import { A, useNavigate } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { createSignal } from "solid-js";
 import { login, request } from "../api/client";
 import { setCurrentUser } from "../stores/auth";
 import type { User } from "../api/types";
 
+function safeNext(value: string | undefined) {
+  if (value && value.startsWith("/") && !value.startsWith("//")) return value;
+  return "/";
+}
+
 export default function Login() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal("");
@@ -19,7 +25,7 @@ export default function Login() {
       await login(email(), password());
       const me = await request<User>("/api/auth/users/me/");
       setCurrentUser(me);
-      navigate("/");
+      navigate(safeNext(typeof params.next === "string" ? params.next : undefined));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти");
     } finally {
